@@ -5,3 +5,6 @@
 *.json
 *.txt
 nb*.xml
+
+# Mac System Files
+.DS_Store
