@@ -15,43 +15,82 @@
  */
 package com.jagrosh.jmusicbot;
 
+import java.awt.Color;
+import java.util.Arrays;
+
+import javax.security.auth.login.LoginException;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.jagrosh.jdautilities.command.CommandClient;
 import com.jagrosh.jdautilities.command.CommandClientBuilder;
 import com.jagrosh.jdautilities.commons.waiter.EventWaiter;
-import com.jagrosh.jdautilities.examples.command.*;
-import com.jagrosh.jmusicbot.commands.admin.*;
-import com.jagrosh.jmusicbot.commands.dj.*;
-import com.jagrosh.jmusicbot.commands.general.*;
-import com.jagrosh.jmusicbot.commands.music.*;
-import com.jagrosh.jmusicbot.commands.owner.*;
+import com.jagrosh.jdautilities.examples.command.AboutCommand;
+import com.jagrosh.jdautilities.examples.command.PingCommand;
+import com.jagrosh.jmusicbot.commands.admin.PrefixCmd;
+import com.jagrosh.jmusicbot.commands.admin.QueueTypeCmd;
+import com.jagrosh.jmusicbot.commands.admin.SetdjCmd;
+import com.jagrosh.jmusicbot.commands.admin.SettcCmd;
+import com.jagrosh.jmusicbot.commands.admin.SetvcCmd;
+import com.jagrosh.jmusicbot.commands.admin.SkipratioCmd;
+import com.jagrosh.jmusicbot.commands.dj.ForceRemoveCmd;
+import com.jagrosh.jmusicbot.commands.dj.ForceskipCmd;
+import com.jagrosh.jmusicbot.commands.dj.MoveTrackCmd;
+import com.jagrosh.jmusicbot.commands.dj.PlaynextCmd;
+import com.jagrosh.jmusicbot.commands.dj.RepeatCmd;
+import com.jagrosh.jmusicbot.commands.dj.SkiptoCmd;
+import com.jagrosh.jmusicbot.commands.dj.StopCmd;
+import com.jagrosh.jmusicbot.commands.dj.VolumeCmd;
+import com.jagrosh.jmusicbot.commands.general.SettingsCmd;
+import com.jagrosh.jmusicbot.commands.music.LyricsCmd;
+import com.jagrosh.jmusicbot.commands.music.NowplayingCmd;
+import com.jagrosh.jmusicbot.commands.music.PauseCmd;
+import com.jagrosh.jmusicbot.commands.music.PlayCmd;
+import com.jagrosh.jmusicbot.commands.music.PlaylistsCmd;
+import com.jagrosh.jmusicbot.commands.music.QueueCmd;
+import com.jagrosh.jmusicbot.commands.music.RemoveCmd;
+import com.jagrosh.jmusicbot.commands.music.SCSearchCmd;
+import com.jagrosh.jmusicbot.commands.music.SearchCmd;
+import com.jagrosh.jmusicbot.commands.music.SeekCmd;
+import com.jagrosh.jmusicbot.commands.music.ShuffleCmd;
+import com.jagrosh.jmusicbot.commands.music.SkipCmd;
+import com.jagrosh.jmusicbot.commands.owner.AutoplaylistCmd;
+import com.jagrosh.jmusicbot.commands.owner.DebugCmd;
+import com.jagrosh.jmusicbot.commands.owner.EvalCmd;
+import com.jagrosh.jmusicbot.commands.owner.PlaylistCmd;
+import com.jagrosh.jmusicbot.commands.owner.SetavatarCmd;
+import com.jagrosh.jmusicbot.commands.owner.SetgameCmd;
+import com.jagrosh.jmusicbot.commands.owner.SetnameCmd;
+import com.jagrosh.jmusicbot.commands.owner.SetstatusCmd;
+import com.jagrosh.jmusicbot.commands.owner.ShutdownCmd;
 import com.jagrosh.jmusicbot.entities.Prompt;
 import com.jagrosh.jmusicbot.gui.GUI;
 import com.jagrosh.jmusicbot.settings.SettingsManager;
 import com.jagrosh.jmusicbot.utils.OtherUtil;
-import java.awt.Color;
-import java.util.Arrays;
-import javax.security.auth.login.LoginException;
-import net.dv8tion.jda.api.*;
+
+import ch.qos.logback.classic.Level;
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.OnlineStatus;
+import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Activity;
+import net.dv8tion.jda.api.exceptions.ErrorResponseException;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.dv8tion.jda.api.utils.cache.CacheFlag;
-import net.dv8tion.jda.api.exceptions.ErrorResponseException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import ch.qos.logback.classic.Level;
 
 /**
  *
  * @author John Grosh (jagrosh)
  */
-public class JMusicBot 
+public class JMusicBot
 {
     public final static Logger LOG = LoggerFactory.getLogger(JMusicBot.class);
     public final static Permission[] RECOMMENDED_PERMS = {Permission.MESSAGE_READ, Permission.MESSAGE_WRITE, Permission.MESSAGE_HISTORY, Permission.MESSAGE_ADD_REACTION,
                                 Permission.MESSAGE_EMBED_LINKS, Permission.MESSAGE_ATTACH_FILES, Permission.MESSAGE_MANAGE, Permission.MESSAGE_EXT_EMOJI,
                                 Permission.VOICE_CONNECT, Permission.VOICE_SPEAK, Permission.NICKNAME_CHANGE};
     public final static GatewayIntent[] INTENTS = {GatewayIntent.DIRECT_MESSAGES, GatewayIntent.GUILD_MESSAGES, GatewayIntent.GUILD_MESSAGE_REACTIONS, GatewayIntent.GUILD_VOICE_STATES};
-    
+
     /**
      * @param args the command line arguments
      */
@@ -67,16 +106,16 @@ public class JMusicBot
             }
         startBot();
     }
-    
+
     private static void startBot()
     {
         // create prompt to handle startup
         Prompt prompt = new Prompt("JMusicBot");
-        
+
         // startup checks
         OtherUtil.checkVersion(prompt);
         OtherUtil.checkJavaVersion(prompt);
-        
+
         // load config
         BotConfig config = new BotConfig(prompt);
         config.load();
@@ -87,17 +126,17 @@ public class JMusicBot
         // set log level from config
         ((ch.qos.logback.classic.Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME)).setLevel(
                 Level.toLevel(config.getLogLevel(), Level.INFO));
-        
+
         // set up the listener
         EventWaiter waiter = new EventWaiter();
         SettingsManager settings = new SettingsManager();
         Bot bot = new Bot(waiter, config, settings);
         CommandClient client = createCommandClient(config, settings, bot);
-        
-        
+
+
         if(!prompt.isNoGUI())
         {
-            try 
+            try
             {
                 GUI gui = new GUI(bot);
                 bot.setGUI(gui);
@@ -112,7 +151,7 @@ public class JMusicBot
                         + "window, please run in nogui mode using the -Dnogui=true flag.");
             }
         }
-        
+
         // attempt to log in and start
         try
         {
@@ -120,7 +159,7 @@ public class JMusicBot
                     .enableCache(CacheFlag.MEMBER_OVERRIDES, CacheFlag.VOICE_STATE)
                     .disableCache(CacheFlag.ACTIVITY, CacheFlag.CLIENT_STATUS, CacheFlag.EMOTE, CacheFlag.ONLINE_STATUS)
                     .setActivity(config.isGameNone() ? null : Activity.playing("loading..."))
-                    .setStatus(config.getStatus()==OnlineStatus.INVISIBLE || config.getStatus()==OnlineStatus.OFFLINE 
+                    .setStatus(config.getStatus()==OnlineStatus.INVISIBLE || config.getStatus()==OnlineStatus.OFFLINE
                             ? OnlineStatus.INVISIBLE : OnlineStatus.DO_NOT_DISTURB)
                     .addEventListeners(client, waiter, new Listener(bot))
                     .setBulkDeleteSplittingEnabled(true)
@@ -136,9 +175,9 @@ public class JMusicBot
                 jda.shutdown();
                 System.exit(1);
             }
-            
+
             // other check that will just be a warning now but may be required in the future
-            // check if the user has changed the prefix and provide info about the 
+            // check if the user has changed the prefix and provide info about the
             // message content intent
             if(!"@mention".equals(config.getPrefix()))
             {
@@ -167,7 +206,7 @@ public class JMusicBot
             System.exit(1);
         }
     }
-    
+
     private static CommandClient createCommandClient(BotConfig config, SettingsManager settings, Bot bot)
     {
         // instantiate about command
@@ -177,7 +216,7 @@ public class JMusicBot
                                 RECOMMENDED_PERMS);
         aboutCommand.setIsAuthor(false);
         aboutCommand.setReplacementCharacter("\uD83C\uDFB6"); // 🎶
-        
+
         // set up the command client
         CommandClientBuilder cb = new CommandClientBuilder()
                 .setPrefix(config.getPrefix())
@@ -190,7 +229,7 @@ public class JMusicBot
                 .addCommands(aboutCommand,
                         new PingCommand(),
                         new SettingsCmd(bot),
-                        
+
                         new LyricsCmd(bot),
                         new NowplayingCmd(bot),
                         new PlayCmd(bot),
@@ -202,17 +241,18 @@ public class JMusicBot
                         new SeekCmd(bot),
                         new ShuffleCmd(bot),
                         new SkipCmd(bot),
+                        // Allow user to use pause command
+                        new PauseCmd(bot),
 
                         new ForceRemoveCmd(bot),
                         new ForceskipCmd(bot),
                         new MoveTrackCmd(bot),
-                        new PauseCmd(bot),
                         new PlaynextCmd(bot),
                         new RepeatCmd(bot),
                         new SkiptoCmd(bot),
                         new StopCmd(bot),
                         new VolumeCmd(bot),
-                        
+
                         new PrefixCmd(bot),
                         new QueueTypeCmd(bot),
                         new SetdjCmd(bot),
@@ -229,15 +269,15 @@ public class JMusicBot
                         new SetstatusCmd(bot),
                         new ShutdownCmd(bot)
                 );
-        
+
         // enable eval if applicable
         if(config.useEval())
             cb.addCommand(new EvalCmd(bot));
-        
+
         // set status if set in config
         if(config.getStatus() != OnlineStatus.UNKNOWN)
             cb.setStatus(config.getStatus());
-        
+
         // set game
         if(config.getGame() == null)
             cb.useDefaultGame();
@@ -245,7 +285,7 @@ public class JMusicBot
             cb.setActivity(null);
         else
             cb.setActivity(config.getGame());
-        
+
         return cb.build();
     }
 }
